@@ -1,0 +1,517 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>[hidden]{display:none!important}body{margin:0}</style>
+<title>Ksp Simulator</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;500;600&family=Space+Grotesk:wght@500;700&display=swap">
+<style>
+/* Layout: lab bench – a header strip, tab bar, then a two-column "beaker + readout" workspace that stacks on phones */
+:root{
+  --bg:#F2F5F9; --surface:#FFFFFF; --surface2:#E9EEF5; --ink:#132238; --muted:#56627A; --line:#D3DBE7;
+  --accent:#0B7A85; --accent-ink:#FFFFFF; --cat:#2F66D0; --an:#E07B12; --good:#1C8650; --bad:#C0352E; --warn:#B7791F;
+  --water:#DCEBFA; --water-edge:#8FB3D9; --glass:#7D8DA6; --solid-shadow:rgba(19,34,56,.18);
+  --f-display:"Space Grotesk",system-ui,sans-serif; --f-body:"IBM Plex Sans",system-ui,sans-serif; --f-mono:"IBM Plex Mono",ui-monospace,monospace;
+  --r:10px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0F1724; --surface:#172234; --surface2:#1F2C42; --ink:#E6ECF5; --muted:#9AA8BE; --line:#2C3B55;
+  --accent:#3FC1CC; --accent-ink:#0B1520; --cat:#6E9BFF; --an:#FFA24A; --good:#4CC686; --bad:#FF6B61; --warn:#E8B04B;
+  --water:#16304D; --water-edge:#3D6A9A; --glass:#7F92B0; --solid-shadow:rgba(0,0,0,.4); color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0F1724; --surface:#172234; --surface2:#1F2C42; --ink:#E6ECF5; --muted:#9AA8BE; --line:#2C3B55;
+  --accent:#3FC1CC; --accent-ink:#0B1520; --cat:#6E9BFF; --an:#FFA24A; --good:#4CC686; --bad:#FF6B61; --warn:#E8B04B;
+  --water:#16304D; --water-edge:#3D6A9A; --glass:#7F92B0; --solid-shadow:rgba(0,0,0,.4); color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.5;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 40px}
+.wrap{max-width:1120px;margin:0 auto;display:flex;flex-direction:column;gap:18px}
+header h1{font-family:var(--f-display);font-size:clamp(26px,4vw,36px);margin:0;letter-spacing:-.01em;text-wrap:balance}
+header p{margin:4px 0 0;color:var(--muted);max-width:70ch}
+.eq{font-family:var(--f-mono);font-weight:600}
+nav.tabs{display:flex;gap:6px;flex-wrap:wrap;border-bottom:1px solid var(--line);padding-bottom:8px}
+nav.tabs a{font-family:var(--f-display);font-weight:500;text-decoration:none;color:var(--muted);padding:8px 14px;border-radius:999px;border:1px solid transparent}
+nav.tabs a[aria-selected="true"]{background:var(--accent);color:var(--accent-ink)}
+nav.tabs a:hover:not([aria-selected="true"]){border-color:var(--line);color:var(--ink)}
+nav.tabs a:focus-visible,button:focus-visible,select:focus-visible,input:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.panel{display:flex;flex-direction:column;gap:16px}
+.grid2{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:18px}
+@media (max-width:820px){.grid2{grid-template-columns:minmax(0,1fr)}}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px;min-width:0}
+.card h2,.card h3{font-family:var(--f-display);margin:0 0 8px;font-size:19px}
+.card h3{font-size:16px}
+.muted{color:var(--muted)}
+.small{font-size:13px}
+canvas{width:100%;max-width:100%;display:block;border-radius:8px}
+.controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+button,select,input{font:inherit}
+button{background:var(--surface2);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:7px 12px;cursor:pointer}
+button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:600}
+button:hover{filter:brightness(1.05)}
+select,input{background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:6px 8px}
+input[type=number]{width:5.5em;font-family:var(--f-mono)}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:5px 12px;cursor:pointer;font-family:var(--f-mono);font-size:14px}
+.chip[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:13px;color:var(--muted)}
+.dot{display:inline-block;width:12px;height:12px;border-radius:50%;vertical-align:-1px;margin-right:5px}
+dl.read{display:grid;grid-template-columns:auto minmax(0,1fr);gap:6px 12px;margin:0}
+dl.read dt{color:var(--muted);font-size:13px}
+dl.read dd{margin:0;font-family:var(--f-mono);font-size:14px;overflow-wrap:anywhere}
+.meter{position:relative;height:16px;border-radius:999px;background:linear-gradient(90deg,var(--good) 0 45%,var(--warn) 45% 55%,var(--bad) 55% 100%);opacity:.9}
+.meter .pin{position:absolute;top:-5px;width:4px;height:26px;background:var(--ink);border-radius:2px;transform:translateX(-2px);transition:left .3s}
+.meter-l{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-top:4px}
+.status{border-radius:8px;padding:10px 12px;font-weight:500;background:var(--surface2);border-left:4px solid var(--accent)}
+.status.good{border-left-color:var(--good)} .status.bad{border-left-color:var(--bad)} .status.warn{border-left-color:var(--warn)}
+.bars{display:grid;grid-template-columns:auto minmax(0,1fr) 3.5em;gap:6px 10px;align-items:center;font-size:13px}
+.bar{height:10px;background:var(--surface2);border-radius:999px;overflow:hidden}
+.bar i{display:block;height:100%;width:0;transition:width .4s}
+.cmp{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+@media (max-width:820px){.cmp{grid-template-columns:minmax(0,1fr)}}
+.big{font-family:var(--f-mono);font-size:22px;font-weight:600}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{border-bottom:1px solid var(--line);padding:7px 8px;text-align:left}
+th{font-family:var(--f-display);font-weight:500;color:var(--muted)}
+td.m{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.tblwrap{overflow-x:auto}
+.form{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px}
+.field{display:flex;flex-direction:column;gap:4px}
+.field label{font-size:13px;color:var(--muted)}
+.sf{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-family:var(--f-mono)}
+ol.steps{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px;counter-reset:s}
+ol.steps li{counter-increment:s;display:grid;grid-template-columns:32px minmax(0,1fr);gap:10px;align-items:start;background:var(--surface2);border-radius:8px;padding:10px}
+ol.steps li::before{content:counter(s);width:28px;height:28px;border-radius:50%;background:var(--accent);color:var(--accent-ink);display:grid;place-items:center;font-weight:600;font-family:var(--f-display)}
+ol.steps b{font-family:var(--f-display);font-weight:500}
+.mono{font-family:var(--f-mono)}
+.verdict{font-family:var(--f-display);font-size:18px}
+.yes{color:var(--bad)} .no{color:var(--good)}
+.beaker{width:120px;height:130px;border:3px solid var(--glass);border-top:none;border-radius:0 0 14px 14px;position:relative;background:var(--water);overflow:hidden;flex:none}
+.beaker .ppt{position:absolute;left:0;right:0;bottom:0;height:0;background:repeating-radial-gradient(circle at 30% 40%,var(--an) 0 2px,transparent 3px 7px),var(--surface2);transition:height .6s}
+.beaker.cloud .ppt{height:34%}
+.qbox{background:var(--surface2);border-radius:8px;padding:12px;font-size:16px}
+.fb{border-radius:8px;padding:10px 12px}
+.fb.ok{background:color-mix(in srgb,var(--good) 15%,var(--surface));} .fb.err{background:color-mix(in srgb,var(--bad) 13%,var(--surface));}
+.row{display:flex;gap:16px;align-items:center;flex-wrap:wrap}
+.note{font-size:13px;color:var(--muted);border-top:1px dashed var(--line);padding-top:8px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+<header>
+  <h1>Ksp Simulator</h1>
+  <p>Watch an ionic solid dissolve, see what a high and a low Ksp look like, then calculate the ionic product Q to predict whether a precipitate forms.</p>
+</header>
+
+<nav class="tabs" role="tablist">
+  <a href="#dissolve" role="tab" id="t-dissolve">1 · Dissolving</a>
+  <a href="#compare" role="tab" id="t-compare">2 · High vs low Ksp</a>
+  <a href="#calculate" role="tab" id="t-calculate">3 · Calculate Q</a>
+  <a href="#practice" role="tab" id="t-practice">4 · Practice</a>
+</nav>
+
+<!-- ============ 1 DISSOLVING ============ -->
+<section class="panel" id="p-dissolve">
+  <div class="card">
+    <div class="controls" style="justify-content:space-between">
+      <div class="chips" id="saltChips" role="group" aria-label="Choose a compound"></div>
+      <div class="legend"><span><i class="dot" style="background:var(--cat)"></i><span id="lgCat">cation</span></span><span><i class="dot" style="background:var(--an)"></i><span id="lgAn">anion</span></span></div>
+    </div>
+  </div>
+  <div class="grid2">
+    <div class="card">
+      <canvas id="simMain" width="800" height="600" aria-label="Beaker showing ions dissolving from a solid"></canvas>
+      <div class="controls" style="margin-top:10px">
+        <button id="bPause">Pause</button>
+        <button id="bSolid">Add more solid</button>
+        <button id="bCommon">Add Cl⁻ ions</button>
+        <button id="bReset" class="primary">Reset</button>
+      </div>
+      <p class="note">Particle numbers are scaled down so you can see them. A real beaker has around 10²⁰ ions or more.</p>
+    </div>
+    <div class="card" style="display:flex;flex-direction:column;gap:12px">
+      <h2 id="saltName">Silver chloride</h2>
+      <dl class="read">
+        <dt>Dissociation</dt><dd id="rEq"></dd>
+        <dt>Ksp expression</dt><dd id="rExpr"></dd>
+        <dt>Ksp at 298 K</dt><dd id="rKsp"></dd>
+        <dt>Ions dissolved</dt><dd id="rCount"></dd>
+      </dl>
+      <div>
+        <div class="small muted" style="margin-bottom:6px">Ionic product compared with Ksp</div>
+        <div class="meter"><span class="pin" id="pin" style="left:5%"></span></div>
+        <div class="meter-l"><span>Q &lt; Ksp</span><span>Q = Ksp</span><span>Q &gt; Ksp</span></div>
+      </div>
+      <div class="bars">
+        <span>Dissolving</span><span class="bar"><i id="barD" style="background:var(--accent)"></i></span><span class="mono" id="vD">0</span>
+        <span>Re-forming solid</span><span class="bar"><i id="barP" style="background:var(--an)"></i></span><span class="mono" id="vP">0</span>
+      </div>
+      <div class="status" id="status">Dissolving…</div>
+      <p class="small muted" id="saltNote" style="margin:0"></p>
+    </div>
+  </div>
+  <div class="card">
+    <h3>What is happening?</h3>
+    <p style="margin:0 0 6px">Ions break off the surface of the solid and spread into the water. Some ions bump back into the solid and re-join it. At first dissolving is faster. As more ions build up in the water, re-joining speeds up until the two rates are <b>equal</b>. The solution is now <b>saturated</b>: this is a dynamic equilibrium, and the ionic product equals Ksp.</p>
+    <p style="margin:0">Press <b>Add …⁻ ions</b> to add more of one ion (a common ion). Q goes above Ksp, so extra solid forms until Q falls back to Ksp.</p>
+  </div>
+</section>
+
+<!-- ============ 2 COMPARE ============ -->
+<section class="panel" id="p-compare" hidden>
+  <div class="card">
+    <h2>What does a high or low Ksp look like?</h2>
+    <p style="margin:0">Three XY salts start with the same amount of solid. The bigger the Ksp, the more ions can stay dissolved before the solution is saturated.</p>
+  </div>
+  <div class="cmp">
+    <div class="card"><h3>Sodium chloride, NaCl</h3><canvas id="c1" width="600" height="450"></canvas>
+      <div class="row" style="justify-content:space-between;margin-top:8px"><span class="mono">Ksp ≈ 37</span><span>Ions dissolved: <b class="mono" id="n1">0</b></span></div>
+      <p class="small muted" style="margin:6px 0 0"><b>Very high Ksp.</b> All the solid dissolves: very soluble.</p></div>
+    <div class="card"><h3>Calcium sulfate, CaSO₄</h3><canvas id="c2" width="600" height="450"></canvas>
+      <div class="row" style="justify-content:space-between;margin-top:8px"><span class="mono">Ksp = 4.9 × 10⁻⁵</span><span>Ions dissolved: <b class="mono" id="n2">0</b></span></div>
+      <p class="small muted" style="margin:6px 0 0"><b>Medium Ksp.</b> Some dissolves, then it saturates: slightly soluble.</p></div>
+    <div class="card"><h3>Silver chloride, AgCl</h3><canvas id="c3" width="600" height="450"></canvas>
+      <div class="row" style="justify-content:space-between;margin-top:8px"><span class="mono">Ksp = 1.8 × 10⁻¹⁰</span><span>Ions dissolved: <b class="mono" id="n3">0</b></span></div>
+      <p class="small muted" style="margin:6px 0 0"><b>Very low Ksp.</b> Almost nothing dissolves: insoluble.</p></div>
+  </div>
+  <div class="grid2">
+    <div class="card">
+      <h3>Ranking by Ksp (same formula type only)</h3>
+      <div class="tblwrap"><table>
+        <thead><tr><th>Compound</th><th>Type</th><th>Ksp / mol² dm⁻⁶</th><th>Solubility</th></tr></thead>
+        <tbody>
+          <tr><td>CaSO₄</td><td>XY</td><td class="m">4.9 × 10⁻⁵</td><td>most soluble</td></tr>
+          <tr><td>CaCO₃</td><td>XY</td><td class="m">3.3 × 10⁻⁹</td><td>↓</td></tr>
+          <tr><td>AgCl</td><td>XY</td><td class="m">1.8 × 10⁻¹⁰</td><td>↓</td></tr>
+          <tr><td>BaSO₄</td><td>XY</td><td class="m">1.1 × 10⁻¹⁰</td><td>↓</td></tr>
+          <tr><td>AgBr</td><td>XY</td><td class="m">5.0 × 10⁻¹³</td><td>least soluble</td></tr>
+        </tbody></table></div>
+    </div>
+    <div class="card">
+      <h3>Careful when the formula type is different</h3>
+      <p style="margin:0 0 8px">Ag₂CrO₄ has a smaller Ksp (1.1 × 10⁻¹²) than AgCl (1.8 × 10⁻¹⁰), but it is actually <b>more</b> soluble. Its Ksp has units of mol³ dm⁻⁹, not mol² dm⁻⁶, because three ions are multiplied.</p>
+      <p class="small muted" style="margin:0">Rule: only compare Ksp values directly when the compounds have the same formula type (XY with XY).</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 3 CALCULATE ============ -->
+<section class="panel" id="p-calculate" hidden>
+  <div class="card">
+    <h2>Will a precipitate form? Step by step</h2>
+    <p class="muted" style="margin:0 0 12px">Choose a compound, enter the two solutions, then press <b>Next step</b> to see each line of working.</p>
+    <div class="form">
+      <div class="field"><label for="cSalt">Compound that might precipitate</label><select id="cSalt"></select></div>
+      <div class="field"><label for="cSrc1">Solution 1 (gives the cation)</label><select id="cSrc1"></select></div>
+      <div class="field"><label for="cSrc2">Solution 2 (gives the anion)</label><select id="cSrc2"></select></div>
+    </div>
+    <div class="form" style="margin-top:12px">
+      <div class="field"><label>Solution 1 concentration / mol dm⁻³ and volume</label>
+        <div class="sf"><input type="number" id="c1m" step="any" value="2.0" aria-label="Solution 1 number"> × 10^ <input type="number" id="c1e" step="1" value="-4" aria-label="Solution 1 power"> <input type="number" id="v1" step="any" value="50" aria-label="Solution 1 volume"> cm³</div></div>
+      <div class="field"><label>Solution 2 concentration / mol dm⁻³ and volume</label>
+        <div class="sf"><input type="number" id="c2m" step="any" value="2.0" aria-label="Solution 2 number"> × 10^ <input type="number" id="c2e" step="1" value="-4" aria-label="Solution 2 power"> <input type="number" id="v2" step="any" value="50" aria-label="Solution 2 volume"> cm³</div></div>
+      <div class="field"><label>Ksp (data book value, you can change it)</label>
+        <div class="sf"><input type="number" id="km" step="any" value="1.8" aria-label="Ksp number"> × 10^ <input type="number" id="ke" step="1" value="-10" aria-label="Ksp power"> <span id="kUnits" class="small"></span></div></div>
+    </div>
+    <div class="controls" style="margin-top:14px">
+      <button class="primary" id="bStart">Start</button><button id="bNext">Next step</button><button id="bAll">Show all</button>
+    </div>
+  </div>
+  <div class="grid2">
+    <div class="card"><ol class="steps" id="steps"></ol></div>
+    <div class="card" style="display:flex;flex-direction:column;gap:12px;align-items:flex-start">
+      <h3>Result</h3>
+      <div class="row"><div class="beaker" id="beaker"><div class="ppt"></div></div>
+        <div id="verdict" class="verdict muted">Work through the steps to find out.</div></div>
+      <div class="note">Q &lt; Ksp → no precipitate (stays in solution)<br>Q = Ksp → saturated<br>Q &gt; Ksp → precipitate forms</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 4 PRACTICE ============ -->
+<section class="panel" id="p-practice" hidden>
+  <div class="card" style="display:flex;flex-direction:column;gap:12px">
+    <div class="row" style="justify-content:space-between"><h2 style="margin:0">Practice: Q vs Ksp</h2><span class="mono" id="score">Score: 0 / 0</span></div>
+    <div class="controls"><label for="pType" class="small muted">Formula type</label>
+      <select id="pType"><option value="any">Mixed</option><option value="XY">XY</option><option value="X2Y">X₂Y</option><option value="XY2">XY₂</option></select>
+      <button class="primary" id="bNew">New question</button></div>
+    <div class="qbox" id="pQ"></div>
+    <div class="form">
+      <div class="field"><label>Your value of Q</label><div class="sf"><input type="number" id="am" step="any" aria-label="Q number"> × 10^ <input type="number" id="ae" step="1" aria-label="Q power"> <span id="aUnits" class="small"></span></div></div>
+      <div class="field"><label>Does a precipitate form?</label><div class="controls">
+        <label><input type="radio" name="pv" value="yes" id="pvY"> Yes, precipitate</label>
+        <label><input type="radio" name="pv" value="no" id="pvN"> No, stays in solution</label></div></div>
+    </div>
+    <div class="controls"><button class="primary" id="bCheck">Check my answer</button><button id="bShow">Show worked answer</button></div>
+    <div id="pFb"></div>
+    <ol class="steps" id="pSteps"></ol>
+  </div>
+</section>
+</div>
+
+<script>
+/* ---------- data ---------- */
+const SIM = {
+  AgCl:{name:"Silver chloride",f:"AgCl",type:"XY",cat:"Ag⁺",an:"Cl⁻",p:1,q:1,eq:"AgCl(s) ⇌ Ag⁺(aq) + Cl⁻(aq)",expr:"Ksp = [Ag⁺][Cl⁻]",ksp:"1.8 × 10⁻¹⁰ mol² dm⁻⁶",s:3,start:30,kd:1.4,common:"Add Cl⁻ ions",note:"Very low Ksp: only a tiny number of ions can stay dissolved. AgCl is insoluble."},
+  CaSO4:{name:"Calcium sulfate",f:"CaSO₄",type:"XY",cat:"Ca²⁺",an:"SO₄²⁻",p:1,q:1,eq:"CaSO₄(s) ⇌ Ca²⁺(aq) + SO₄²⁻(aq)",expr:"Ksp = [Ca²⁺][SO₄²⁻]",ksp:"4.9 × 10⁻⁵ mol² dm⁻⁶",s:12,start:30,kd:2,common:"Add SO₄²⁻ ions",note:"Medium Ksp: some solid dissolves before the solution is saturated. CaSO₄ is slightly soluble."},
+  PbI2:{name:"Lead(II) iodide",f:"PbI₂",type:"XY₂",cat:"Pb²⁺",an:"I⁻",p:1,q:2,eq:"PbI₂(s) ⇌ Pb²⁺(aq) + 2I⁻(aq)",expr:"Ksp = [Pb²⁺][I⁻]²",ksp:"9.8 × 10⁻⁹ mol³ dm⁻⁹",s:6,start:24,kd:1.6,common:"Add I⁻ ions",note:"XY₂: each PbI₂ releases 1 Pb²⁺ and 2 I⁻, so [I⁻] is squared in Ksp."},
+  Ag2CrO4:{name:"Silver chromate",f:"Ag₂CrO₄",type:"X₂Y",cat:"Ag⁺",an:"CrO₄²⁻",p:2,q:1,eq:"Ag₂CrO₄(s) ⇌ 2Ag⁺(aq) + CrO₄²⁻(aq)",expr:"Ksp = [Ag⁺]²[CrO₄²⁻]",ksp:"1.1 × 10⁻¹² mol³ dm⁻⁹",s:4,start:24,kd:1.5,common:"Add CrO₄²⁻ ions",note:"X₂Y: each Ag₂CrO₄ releases 2 Ag⁺ and 1 CrO₄²⁻, so [Ag⁺] is squared in Ksp."},
+  NaCl:{name:"Sodium chloride",f:"NaCl",type:"XY",cat:"Na⁺",an:"Cl⁻",p:1,q:1,eq:"NaCl(s) ⇌ Na⁺(aq) + Cl⁻(aq)",expr:"Ksp = [Na⁺][Cl⁻]",ksp:"≈ 37 mol² dm⁻⁶ (very large)",s:400,start:20,kd:3.5,common:"Add Cl⁻ ions",note:"Very high Ksp: every bit of this solid dissolves. The solution never becomes saturated here, so Q stays below Ksp."}
+};
+const SALTS = [
+ {f:"AgCl",type:"XY",cat:"Ag⁺",an:"Cl⁻",ksp:1.8e-10,cs:[["AgNO₃",1]],as:[["NaCl",1],["KCl",1],["CaCl₂",2]]},
+ {f:"AgBr",type:"XY",cat:"Ag⁺",an:"Br⁻",ksp:5.0e-13,cs:[["AgNO₃",1]],as:[["KBr",1],["NaBr",1]]},
+ {f:"BaSO₄",type:"XY",cat:"Ba²⁺",an:"SO₄²⁻",ksp:1.1e-10,cs:[["BaCl₂",1],["Ba(NO₃)₂",1]],as:[["Na₂SO₄",1]]},
+ {f:"CaSO₄",type:"XY",cat:"Ca²⁺",an:"SO₄²⁻",ksp:4.9e-5,cs:[["Ca(NO₃)₂",1]],as:[["Na₂SO₄",1]]},
+ {f:"CaCO₃",type:"XY",cat:"Ca²⁺",an:"CO₃²⁻",ksp:3.3e-9,cs:[["CaCl₂",1]],as:[["Na₂CO₃",1]]},
+ {f:"Ag₂CrO₄",type:"X2Y",cat:"Ag⁺",an:"CrO₄²⁻",ksp:1.1e-12,cs:[["AgNO₃",1]],as:[["K₂CrO₄",1]]},
+ {f:"Ag₂CO₃",type:"X2Y",cat:"Ag⁺",an:"CO₃²⁻",ksp:8.1e-12,cs:[["AgNO₃",1]],as:[["Na₂CO₃",1]]},
+ {f:"Ag₂SO₄",type:"X2Y",cat:"Ag⁺",an:"SO₄²⁻",ksp:1.2e-5,cs:[["AgNO₃",1]],as:[["Na₂SO₄",1]]},
+ {f:"PbI₂",type:"XY2",cat:"Pb²⁺",an:"I⁻",ksp:9.8e-9,cs:[["Pb(NO₃)₂",1]],as:[["KI",1],["NaI",1]]},
+ {f:"PbCl₂",type:"XY2",cat:"Pb²⁺",an:"Cl⁻",ksp:1.7e-5,cs:[["Pb(NO₃)₂",1]],as:[["NaCl",1],["CaCl₂",2]]},
+ {f:"PbBr₂",type:"XY2",cat:"Pb²⁺",an:"Br⁻",ksp:6.6e-6,cs:[["Pb(NO₃)₂",1]],as:[["KBr",1]]},
+ {f:"CaF₂",type:"XY2",cat:"Ca²⁺",an:"F⁻",ksp:3.9e-11,cs:[["Ca(NO₃)₂",1]],as:[["NaF",1]]},
+ {f:"Mg(OH)₂",type:"XY2",cat:"Mg²⁺",an:"OH⁻",ksp:5.6e-12,cs:[["MgCl₂",1],["Mg(NO₃)₂",1]],as:[["NaOH",1],["Ba(OH)₂",2]]},
+ {f:"Ca(OH)₂",type:"XY2",cat:"Ca²⁺",an:"OH⁻",ksp:5.5e-6,cs:[["CaCl₂",1]],as:[["NaOH",1]]}
+];
+const PQ = {XY:[1,1],X2Y:[2,1],XY2:[1,2]};
+const TYPE_LABEL = {XY:"XY",X2Y:"X₂Y",XY2:"XY₂"};
+const UNITS = t => t==="XY" ? "mol² dm⁻⁶" : "mol³ dm⁻⁹";
+
+/* ---------- number formatting ---------- */
+const SUP = {"-":"⁻","0":"⁰","1":"¹","2":"²","3":"³","4":"⁴","5":"⁵","6":"⁶","7":"⁷","8":"⁸","9":"⁹"};
+const supStr = n => String(n).split("").map(c=>SUP[c]).join("");
+function sci(x, sf=2){
+  if(!isFinite(x) || x<=0) return "0";
+  let e = Math.floor(Math.log10(x)); let m = x/Math.pow(10,e);
+  m = Number(m.toPrecision(sf)); if(m>=10){m/=10;e+=1}
+  return m.toFixed(sf-1) + " × 10" + supStr(e);
+}
+const sq = (s,n) => n===2 ? "("+s+")²" : "("+s+")";
+const esc = s => s;
+
+/* ---------- theme colours for canvas ---------- */
+let C = {};
+function readColors(){ const cs=getComputedStyle(document.documentElement);
+  ["--cat","--an","--water","--water-edge","--glass","--ink","--muted","--solid-shadow","--surface"].forEach(k=>C[k]=cs.getPropertyValue(k).trim()); }
+readColors();
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change",readColors);
+new MutationObserver(readColors).observe(document.documentElement,{attributes:true,attributeFilter:["data-theme"]});
+
+/* ---------- simulation ---------- */
+const LW=400, LH=300, BX0=28, BX1=372, SURF=46, BOT=284, COLS=10, ROWS=6, SW=22, SH=18, LX=200-COLS*SW/2;
+function unitOffsets(p,q){
+  if(p===1&&q===1) return {c:[[-5,0]],a:[[5.5,0]]};
+  if(p===1&&q===2) return {c:[[0,-3.5]],a:[[-6.5,4],[6.5,4]]};
+  return {c:[[-6.5,4],[6.5,4]],a:[[0,-3.5]]};
+}
+class Sim{
+  constructor(canvas,key){this.cv=canvas;this.ctx=canvas.getContext("2d");this.paused=false;this.set(key)}
+  set(key){this.key=key;this.d=SIM[key];this.reset()}
+  reset(){
+    const d=this.d; this.ions=[]; this.groups=[]; this.solid=Math.min(d.start,COLS*ROWS); this.evD=[]; this.evP=[]; this.t=0; this.ratio=0;
+    const ct=d.s*d.p, at=d.s*d.q; this.kp=d.kd/(Math.pow(ct,d.p)*Math.pow(at,d.q)); this.off=unitOffsets(d.p,d.q);
+  }
+  slotPos(i){const r=Math.floor(i/COLS), c=i%COLS; return [LX+SW*c+SW/2, BOT-SH/2-1-r*SH]}
+  freeCount(type){let n=0;for(const o of this.ions) if(o.type===type&&!o.g) n++; return n}
+  topY(){const rows=Math.ceil((this.solid+this.groups.length)/COLS); return BOT-rows*SH}
+  spawn(type,x,y,vx,vy){this.ions.push({type,x,y,vx,vy,g:null})}
+  addSolid(n){this.solid=Math.min(this.solid+n,COLS*ROWS-this.groups.length)}
+  addCommon(n){for(let i=0;i<n;i++) this.spawn("a",BX0+20+Math.random()*(BX1-BX0-40),SURF+8+Math.random()*20,(Math.random()-.5)*40,30+Math.random()*20)}
+  dissolve(){
+    if(this.solid<=0) return; this.solid--; const [x,y]=this.slotPos(this.solid);
+    for(const [dx,dy] of this.off.c) this.spawn("c",x+dx,y+dy,(Math.random()-.5)*50,-40-Math.random()*30);
+    for(const [dx,dy] of this.off.a) this.spawn("a",x+dx,y+dy,(Math.random()-.5)*50,-40-Math.random()*30);
+    this.evD.push(this.t);
+  }
+  precipitate(){
+    const d=this.d, slot=this.solid+this.groups.length; if(slot>=COLS*ROWS) return;
+    const [x,y]=this.slotPos(slot);
+    const pick=(type,n)=>{const f=this.ions.filter(o=>o.type===type&&!o.g); if(f.length<n) return null;
+      f.sort((a,b)=>(a.x-x)**2+(a.y-y)**2-((b.x-x)**2+(b.y-y)**2)); return f.slice(0,n)};
+    const cs=pick("c",d.p), as=pick("a",d.q); if(!cs||!as) return;
+    const g={slot,members:[]}; cs.forEach((o,i)=>{o.g=g;o.tx=x+this.off.c[i][0];o.ty=y+this.off.c[i][1];g.members.push(o)});
+    as.forEach((o,i)=>{o.g=g;o.tx=x+this.off.a[i][0];o.ty=y+this.off.a[i][1];g.members.push(o)});
+    this.groups.push(g); this.evP.push(this.t);
+  }
+  step(dt){
+    if(this.paused) return; this.t+=dt; const d=this.d;
+    if(this.solid>0 && Math.random()<d.kd*dt) this.dissolve();
+    const nc=this.freeCount("c"), na=this.freeCount("a");
+    let rate=this.kp*Math.pow(nc,d.p)*Math.pow(na,d.q)*dt;
+    while(rate>0){ if(Math.random()<Math.min(rate,1)) this.precipitate(); rate-=1 }
+    const top=this.topY();
+    for(const o of this.ions){
+      if(o.g){const dx=o.tx-o.x, dy=o.ty-o.y, dist=Math.hypot(dx,dy), sp=90*dt;
+        if(dist<=sp){o.x=o.tx;o.y=o.ty;o.done=true}else{o.x+=dx/dist*sp;o.y+=dy/dist*sp}continue}
+      o.vx+=(Math.random()-.5)*160*dt; o.vy+=(Math.random()-.5)*160*dt;
+      const s=Math.hypot(o.vx,o.vy), max=55; if(s>max){o.vx*=max/s;o.vy*=max/s}
+      o.x+=o.vx*dt; o.y+=o.vy*dt; const r=6;
+      if(o.x<BX0+r){o.x=BX0+r;o.vx=Math.abs(o.vx)} if(o.x>BX1-r){o.x=BX1-r;o.vx=-Math.abs(o.vx)}
+      if(o.y<SURF+r){o.y=SURF+r;o.vy=Math.abs(o.vy)}
+      const floor=(o.x>LX-4&&o.x<LX+COLS*SW+4)?Math.min(top,BOT)-r:BOT-r;
+      if(o.y>floor){o.y=floor;o.vy=-Math.abs(o.vy)}
+    }
+    this.groups=this.groups.filter(g=>{ if(g.members.every(m=>m.done)){ this.ions=this.ions.filter(o=>o.g!==g); this.solid++; return false} return true });
+    const ct=d.s*d.p, at=d.s*d.q, Q=Math.pow(this.freeCount("c"),d.p)*Math.pow(this.freeCount("a"),d.q), K=Math.pow(ct,d.p)*Math.pow(at,d.q);
+    const target=Q/K; this.ratio+= (target-this.ratio)*Math.min(1,dt*1.2);
+    const cut=this.t-6; this.evD=this.evD.filter(t=>t>cut); this.evP=this.evP.filter(t=>t>cut);
+  }
+  draw(){
+    const cv=this.cv, w=cv.clientWidth; if(!w) return;
+    const dpr=window.devicePixelRatio||1, h=w*LH/LW;
+    if(cv.width!==Math.round(w*dpr)){cv.width=Math.round(w*dpr);cv.height=Math.round(h*dpr)}
+    const ctx=this.ctx, k=cv.width/LW; ctx.setTransform(k,0,0,k,0,0); ctx.clearRect(0,0,LW,LH);
+    ctx.fillStyle=C["--water"]; ctx.fillRect(BX0,SURF,BX1-BX0,BOT-SURF);
+    ctx.strokeStyle=C["--water-edge"]; ctx.lineWidth=1.5; ctx.beginPath(); ctx.moveTo(BX0,SURF); ctx.lineTo(BX1,SURF); ctx.stroke();
+    ctx.strokeStyle=C["--glass"]; ctx.lineWidth=3; ctx.beginPath(); ctx.moveTo(BX0-2,16); ctx.lineTo(BX0-2,BOT+2); ctx.lineTo(BX1+2,BOT+2); ctx.lineTo(BX1+2,16); ctx.stroke();
+    for(let i=0;i<this.solid;i++){const [x,y]=this.slotPos(i); this.unit(x,y)}
+    for(const o of this.ions) this.ion(o.type,o.x,o.y);
+  }
+  ion(t,x,y){const ctx=this.ctx, r=t==="c"?4.6:5.6; ctx.beginPath(); ctx.arc(x,y,r,0,7); ctx.fillStyle=t==="c"?C["--cat"]:C["--an"]; ctx.fill();
+    ctx.fillStyle="#fff"; ctx.font="bold 7px sans-serif"; ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText(t==="c"?"+":"−",x,y+.3)}
+  unit(x,y){for(const [dx,dy] of this.off.a) this.ion("a",x+dx,y+dy); for(const [dx,dy] of this.off.c) this.ion("c",x+dx,y+dy)}
+}
+
+/* ---------- tab 1 wiring ---------- */
+const main=new Sim(document.getElementById("simMain"),"AgCl");
+const chips=document.getElementById("saltChips");
+Object.entries(SIM).forEach(([k,d])=>{const b=document.createElement("button");b.className="chip";b.textContent=d.f;b.dataset.k=k;b.setAttribute("aria-pressed",k==="AgCl");
+  b.onclick=()=>{chips.querySelectorAll(".chip").forEach(c=>c.setAttribute("aria-pressed",c===b));main.set(k);showSalt()};chips.appendChild(b)});
+function showSalt(){const d=main.d;
+  document.getElementById("saltName").textContent=d.name+", "+d.f;
+  document.getElementById("rEq").textContent=d.eq; document.getElementById("rExpr").textContent=d.expr; document.getElementById("rKsp").textContent=d.ksp;
+  document.getElementById("lgCat").textContent=d.cat+" (cation)"; document.getElementById("lgAn").textContent=d.an+" (anion)";
+  document.getElementById("bCommon").textContent=d.common; document.getElementById("saltNote").textContent=d.note;
+  document.getElementById("bPause").textContent="Pause"; main.paused=false;}
+showSalt();
+document.getElementById("bPause").onclick=e=>{main.paused=!main.paused;e.target.textContent=main.paused?"Play":"Pause"};
+document.getElementById("bSolid").onclick=()=>main.addSolid(10);
+document.getElementById("bCommon").onclick=()=>main.addCommon(8);
+document.getElementById("bReset").onclick=()=>{main.reset()};
+function readout(){
+  const d=main.d, nc=main.freeCount("c"), na=main.freeCount("a");
+  document.getElementById("rCount").textContent=nc+" "+d.cat+"  +  "+na+" "+d.an;
+  const lr=Math.log10(Math.max(main.ratio,1e-3)); const pct=Math.max(2,Math.min(98,50+lr*25));
+  document.getElementById("pin").style.left=pct+"%";
+  const rd=main.evD.length/6, rp=main.evP.length/6, mx=d.kd*1.4;
+  document.getElementById("barD").style.width=Math.min(100,rd/mx*100)+"%"; document.getElementById("barP").style.width=Math.min(100,rp/mx*100)+"%";
+  document.getElementById("vD").textContent=rd.toFixed(1)+"/s"; document.getElementById("vP").textContent=rp.toFixed(1)+"/s";
+  const st=document.getElementById("status"); let cls="", txt;
+  if(main.solid===0 && main.ratio<0.75){cls="good";txt="All the solid has dissolved. Q < Ksp, so the solution is unsaturated."}
+  else if(main.ratio>1.6){cls="bad";txt="Q > Ksp: too many ions in solution, so ions re-join the solid (precipitate forms)."}
+  else if(main.ratio>=0.6 && main.t>4){cls="warn";txt="Saturated: dissolving rate = re-forming rate. Dynamic equilibrium, Q = Ksp."}
+  else {txt="Dissolving: Q < Ksp, so more solid can dissolve."}
+  st.className="status "+cls; st.textContent=txt;
+}
+
+/* ---------- tab 2 ---------- */
+const cmp=[["c1","NaCl","n1"],["c2","CaSO4","n2"],["c3","AgCl","n3"]].map(([id,k,n])=>{const s=new Sim(document.getElementById(id),k);s.nEl=document.getElementById(n);return s});
+
+/* ---------- animation loop ---------- */
+let last=performance.now();
+function frame(now){const dt=Math.min(.05,(now-last)/1000); last=now;
+  const vis=[main,...cmp].filter(s=>s.cv.offsetParent!==null);
+  for(const s of vis){s.step(dt);s.draw()}
+  if(main.cv.offsetParent!==null) readout();
+  for(const s of cmp) if(s.cv.offsetParent!==null) s.nEl.textContent=s.freeCount("c")+s.freeCount("a");
+  requestAnimationFrame(frame)}
+requestAnimationFrame(frame);
+
+/* ---------- working (shared by calculator & practice) ---------- */
+function work(q){
+  const s=q.salt, [p,qq]=PQ[s.type], u=UNITS(s.type);
+  const cI=q.c1*q.n1, aI=q.c2*q.n2, Vt=q.v1+q.v2, cN=cI*q.v1/Vt, aN=aI*q.v2/Vt, Q=Math.pow(cN,p)*Math.pow(aN,qq);
+  const exprQ = "Q = ["+s.cat+"]"+(p===2?"²":"")+"["+s.an+"]"+(qq===2?"²":"");
+  const eqn = s.f+"(s) ⇌ "+(p===2?"2":"")+s.cat+"(aq) + "+(qq===2?"2":"")+s.an+"(aq)";
+  const ionLine=(src,n,c,ion,val)=> n===2 ? `${src} gives 2 ${ion}, so [${ion}] = 2 × ${sci(c)} = ${sci(val)} mol dm⁻³` : `${src} gives 1 ${ion}, so [${ion}] = ${sci(val)} mol dm⁻³`;
+  const steps=[
+    ["Equation and Q expression", `<span class="mono">${eqn}</span><br><span class="mono">${exprQ}</span>`],
+    ["Ions in each solution (before mixing)", `<span class="mono">${ionLine(q.s1,q.n1,q.c1,s.cat,cI)}<br>${ionLine(q.s2,q.n2,q.c2,s.an,aI)}</span>`],
+    ["Total volume", `<span class="mono">${q.v1} + ${q.v2} = ${Vt} cm³</span>`],
+    ["New ["+s.cat+"] after mixing", `<span class="mono">${sci(cI)} × ${q.v1}/${Vt} = ${sci(cN)} mol dm⁻³</span>`],
+    ["New ["+s.an+"] after mixing", `<span class="mono">${sci(aI)} × ${q.v2}/${Vt} = ${sci(aN)} mol dm⁻³</span>`],
+    ["Substitute into Q", `<span class="mono">Q = ${sq(sci(cN),p)}${sq(sci(aN),qq)}</span>`],
+    ["Calculate Q", `<span class="mono">Q = ${sci(Q)} ${u}</span>`],
+    ["Compare with Ksp", `<span class="mono">Q = ${sci(Q)} ${Q>q.ksp?">":"<"} Ksp = ${sci(q.ksp)}</span><br>`+(Q>q.ksp?`<b class="yes">Q > Ksp, so ${s.f} precipitates.</b>`:`<b class="no">Q < Ksp, so ${s.f} stays in solution (no precipitate).</b>`)]
+  ];
+  return {steps,Q,ppt:Q>q.ksp,u,alt:{noDil:Math.pow(cI,p)*Math.pow(aI,qq), noPow:cN*aN, noDouble:Math.pow(q.c1*q.v1/Vt,p)*Math.pow(q.c2*q.v2/Vt,qq)}};
+}
+function renderSteps(ol,steps,n){ol.innerHTML=steps.slice(0,n).map(([h,b])=>`<li><div><b>${h}</b><br>${b}</div></li>`).join("")}
+
+/* ---------- tab 3 calculator ---------- */
+const $=id=>document.getElementById(id);
+SALTS.forEach((s,i)=>{const o=document.createElement("option");o.value=i;o.textContent=`${s.f}  (${TYPE_LABEL[s.type]}, Ksp ${sci(s.ksp)})`;$("cSalt").appendChild(o)});
+function fillSources(){const s=SALTS[$("cSalt").value];
+  $("cSrc1").innerHTML=s.cs.map(([f,n],i)=>`<option value="${i}">${f}</option>`).join("");
+  $("cSrc2").innerHTML=s.as.map(([f,n],i)=>`<option value="${i}">${f}${n===2?" (gives 2 "+s.an+")":""}</option>`).join("");
+  const e=Math.floor(Math.log10(s.ksp)); $("km").value=Number((s.ksp/Math.pow(10,e)).toPrecision(2)); $("ke").value=e; $("kUnits").textContent=UNITS(s.type);}
+$("cSalt").onchange=()=>{fillSources();start()};
+let calc=null, shown=0;
+function readCalc(){const s=SALTS[$("cSalt").value], a=s.cs[$("cSrc1").value], b=s.as[$("cSrc2").value];
+  const num=id=>parseFloat($(id).value);
+  return {salt:s,s1:a[0],n1:a[1],s2:b[0],n2:b[1],c1:num("c1m")*Math.pow(10,num("c1e")),c2:num("c2m")*Math.pow(10,num("c2e")),v1:num("v1"),v2:num("v2"),ksp:num("km")*Math.pow(10,num("ke"))}}
+function start(){const q=readCalc(); const bad=[q.c1,q.c2,q.v1,q.v2,q.ksp].some(v=>!isFinite(v)||v<=0);
+  if(bad){$("steps").innerHTML=`<li><div><b>Check your numbers</b><br>Every concentration, volume and Ksp must be a positive number.</div></li>`;calc=null;return}
+  calc=work(q); shown=1; renderSteps($("steps"),calc.steps,shown); updVerdict()}
+function updVerdict(){const v=$("verdict"), b=$("beaker");
+  if(calc && shown>=calc.steps.length){v.className="verdict "+(calc.ppt?"yes":"no");v.textContent=calc.ppt?"Precipitate forms":"No precipitate";b.classList.toggle("cloud",calc.ppt)}
+  else{v.className="verdict muted";v.textContent="Work through the steps to find out.";b.classList.remove("cloud")}}
+$("bStart").onclick=start;
+$("bNext").onclick=()=>{if(!calc) return start(); shown=Math.min(shown+1,calc.steps.length); renderSteps($("steps"),calc.steps,shown); updVerdict()};
+$("bAll").onclick=()=>{if(!calc) start(); if(!calc) return; shown=calc.steps.length; renderSteps($("steps"),calc.steps,shown); updVerdict()};
+["cSrc1","cSrc2","c1m","c1e","v1","c2m","c2e","v2","km","ke"].forEach(id=>$(id).addEventListener("change",start));
+fillSources(); start();
+
+/* ---------- tab 4 practice ---------- */
+const VOLS=[[50,50],[25,25],[20,80],[40,60],[30,70],[25,75],[10,90],[60,40],[80,20],[50,50]];
+const MANT=[1.0,2.0,3.0,4.0,5.0,6.0,8.0];
+const rnd=a=>a[Math.floor(Math.random()*a.length)];
+let pq=null, pw=null, score=[0,0], marked=false;
+function newQ(){
+  const t=$("pType").value, pool=SALTS.filter(s=>t==="any"||s.type===t);
+  for(let tries=0;tries<800;tries++){
+    const s=rnd(pool), a=rnd(s.cs), b=rnd(s.as), [v1,v2]=rnd(VOLS);
+    const c1=rnd(MANT)*Math.pow(10,-1-Math.floor(Math.random()*6)), c2=rnd(MANT)*Math.pow(10,-1-Math.floor(Math.random()*6));
+    const q={salt:s,s1:a[0],n1:a[1],s2:b[0],n2:b[1],c1,c2,v1,v2,ksp:s.ksp}; const w=work(q); const g=Math.abs(Math.log10(w.Q/s.ksp));
+    if(g>0.12 && g<2.3){pq=q;pw=w;break}
+  }
+  const q=pq;
+  $("pQ").innerHTML=`${q.v1} cm³ of <span class="mono">${sci(q.c1)}</span> mol dm⁻³ <b>${q.s1}</b> is mixed with ${q.v2} cm³ of <span class="mono">${sci(q.c2)}</span> mol dm⁻³ <b>${q.s2}</b>.<br>
+    K<sub>sp</sub>(${q.salt.f}) = <span class="mono">${sci(q.ksp)} ${UNITS(q.salt.type)}</span>. Calculate Q and decide whether ${q.salt.f} precipitates.`;
+  $("aUnits").textContent=UNITS(q.salt.type); $("am").value=""; $("ae").value=""; $("pvY").checked=false; $("pvN").checked=false;
+  $("pFb").innerHTML=""; $("pSteps").innerHTML=""; marked=false;
+}
+function close(a,b){return Math.abs(a/b-1)<0.04}
+$("bNew").onclick=newQ; $("pType").onchange=newQ;
+$("bCheck").onclick=()=>{
+  const m=parseFloat($("am").value), e=parseFloat($("ae").value), v=document.querySelector('input[name="pv"]:checked');
+  if(!isFinite(m)||!isFinite(e)||!v){$("pFb").innerHTML=`<div class="fb err">Enter your value of Q (number and power of ten) and choose Yes or No.</div>`;return}
+  const Qs=m*Math.pow(10,e), okQ=close(Qs,pw.Q), okV=(v.value==="yes")===pw.ppt;
+  let msg=[];
+  msg.push(okQ?`✓ Q is correct: ${sci(pw.Q)} ${pw.u}.`:`✗ Q is not right yet.`);
+  if(!okQ){ if(close(Qs,pw.alt.noDil)) msg.push("Hint: you did not dilute. Multiply each concentration by its volume ÷ total volume.");
+    else if(close(Qs,pw.alt.noPow)) msg.push("Hint: one ion has a 2 in the formula, so its concentration must be squared.");
+    else if(pq.n1+pq.n2>2 && close(Qs,pw.alt.noDouble)) msg.push("Hint: one of the solutions gives TWO of the ion per formula. Double that concentration first.");
+    else msg.push("Hint: press Show worked answer and compare each step with yours."); }
+  msg.push(okV?"✓ Your precipitate decision is correct.":`✗ Check the decision: ${pw.ppt?"Q > Ksp, so a precipitate forms.":"Q < Ksp, so it stays in solution."}`);
+  if(!marked){score[1]++; if(okQ&&okV) score[0]++; marked=true; $("score").textContent=`Score: ${score[0]} / ${score[1]}`}
+  $("pFb").innerHTML=`<div class="fb ${okQ&&okV?"ok":"err"}">${msg.join("<br>")}</div>`;
+};
+$("bShow").onclick=()=>renderSteps($("pSteps"),pw.steps,pw.steps.length);
+newQ();
+
+/* ---------- tabs via hash ---------- */
+const TABS=["dissolve","compare","calculate","practice"];
+function route(){const h=location.hash.slice(1); const cur=TABS.includes(h)?h:"dissolve";
+  TABS.forEach(t=>{$("p-"+t).hidden=t!==cur; $("t-"+t).setAttribute("aria-selected",t===cur)});
+  if(cur==="compare") cmp.forEach(s=>s.reset());}
+addEventListener("hashchange",route); route();
+</script>
+</body>
+</html>
